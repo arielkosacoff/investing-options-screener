@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(chmod:*)",
+      "Bash(pip3 install:*)",
+      "Bash(./setup_database.sh:*)",
+      "Bash(if [ -d cache ])",
+      "Bash(then echo \"Cache folder exists, removing...\")",
+      "Bash(else echo \"Cache folder does not exist (already clean)\")",
+      "Bash(fi)",
+      "Bash(psql:*)",
+      "Bash(source .env)",
+      "Bash(PGPASSWORD=root psql:*)",
+      "Bash(PGPASSWORD=$DB_PASSWORD psql:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

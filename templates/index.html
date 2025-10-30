@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Put Option Screener - Database Version</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            min-width: 1400px;
+        }
+        .container {
+            max-width: 100%;
+            width: 100%;
+        }
+        .workflow-section {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 1px solid #0f3460;
+        }
+        .workflow-section h3 {
+            color: #00d9ff;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        .workflow-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .sync-status {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .sync-status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .sync-status-item:last-child {
+            border-bottom: none;
+        }
+        .sync-status-label {
+            color: #aaa;
+        }
+        .sync-status-value {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        .progress-container {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #1a1a2e;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88 0%, #00d9ff 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-weight: bold;
+        }
+        .progress-details {
+            color: #aaa;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #00ff88 0%, #00d9ff 100%);
+            color: #000;
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Put Option Screener</h1>
+            <p class="subtitle">Database-Powered Options Screening System</p>
+        </header>
+
+        <!-- Sync Status Display -->
+        <div class="sync-status" id="syncStatus">
+            <h3>Data Status</h3>
+            <div class="sync-status-item">
+                <span class="sync-status-label">Last Price Sync:</span>
+                <span class="sync-status-value" id="lastPriceSync">Not synced</span>
+            </div>
+            <div class="sync-status-item">
+                <span class="sync-status-label">Last Metrics Calc:</span>
+                <span class="sync-status-value" id="lastMetricsCalc">Not calculated</span>
+            </div>
+            <div class="sync-status-item">
+                <span class="sync-status-label">Today's Date:</span>
+                <span class="sync-status-value" id="todayDate">-</span>
+            </div>
+        </div>
+
+        <!-- Workflow Section -->
+        <div class="workflow-section">
+            <h3>Workflow Steps</h3>
+            <p style="color: #aaa; margin-bottom: 15px;">
+                Run these steps in order for first-time setup. After initial population, only run "Update Prices" and "Calculate Metrics" daily.
+            </p>
+            <div class="workflow-buttons">
+                <button id="btnPopulateStocks" class="btn btn-primary">
+                    1. Populate Stocks<br><small>(~2000 tickers)</small>
+                </button>
+                <button id="btnSyncPrices" class="btn btn-success">
+                    2. Update Prices<br><small>(Incremental)</small>
+                </button>
+                <button id="btnCalculateMetrics" class="btn btn-info">
+                    3. Calculate Metrics<br><small>(52W, ATR, etc.)</small>
+                </button>
+                <button id="btnExecuteScreener" class="btn btn-warning">
+                    4. Execute Screener<br><small>(Find opportunities)</small>
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress Container -->
+        <div class="progress-container" id="progressContainer">
+            <h3 id="progressTitle">Processing...</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%">
+                    <span id="progressPercent">0%</span>
+                </div>
+            </div>
+            <div class="progress-details">
+                <div><strong>Status:</strong> <span id="progressStatus">-</span></div>
+                <div><strong>Current:</strong> <span id="progressCurrent">-</span> / <span id="progressTotal">-</span></div>
+                <div><strong>Ticker:</strong> <span id="progressTicker">-</span></div>
+                <div><strong>Time Elapsed:</strong> <span id="progressElapsed">-</span></div>
+                <div><strong>ETA:</strong> <span id="progressETA">-</span></div>
+                <div><strong>Message:</strong> <span id="progressMessage">-</span></div>
+            </div>
+        </div>
+
+        <!-- Configuration Section -->
+        <div class="workflow-section">
+            <h3>Configuration</h3>
+            <div class="workflow-buttons">
+                <button id="btnShowConfig" class="btn btn-secondary">
+                    View/Edit Config
+                </button>
+            </div>
+            <div id="configDisplay" style="margin-top: 15px; display: none;">
+                <div id="configForm" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; background: #0f3460; padding: 20px; border-radius: 8px;">
+                    <!-- Config fields will be added dynamically -->
+                </div>
+                <div style="margin-top: 15px; text-align: right;">
+                    <button id="btnSaveConfig" class="btn btn-success">Save Configuration</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-container" id="resultsContainer" style="display: none;">
+            <h2>Screening Results</h2>
+            <div class="results-summary" id="resultsSummary"></div>
+            <div class="table-container">
+                <table id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>Ticker</th>
+                            <th>Company Name</th>
+                            <th>Price</th>
+                            <th>Sector</th>
+                            <th>Stock 52W%</th>
+                            <th>Sector 52W%</th>
+                            <th>P/E</th>
+                            <th>Sector P/E</th>
+                            <th>Mkt Cap ($B)</th>
+                            <th>ATR %</th>
+                            <th>Strike</th>
+                            <th>DTE</th>
+                            <th>Premium</th>
+                            <th>Yield</th>
+                            <th>Contracts</th>
+                            <th>Days to Earnings</th>
+                            <th>Links</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let progressInterval = null;
+
+        // Format time in seconds to human readable format
+        function formatTime(seconds) {
+            if (seconds < 60) {
+                return `${seconds}s`;
+            } else if (seconds < 3600) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}m ${secs}s`;
+            } else {
+                const hours = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                return `${hours}h ${mins}m`;
+            }
+        }
+
+        // Load sync status on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSyncStatus();
+            loadResults();
+        });
+
+        // Load sync status
+        function loadSyncStatus() {
+            fetch('/api/sync-status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('lastPriceSync').textContent = data.last_price_sync || 'Not synced';
+                        document.getElementById('lastMetricsCalc').textContent = data.last_metrics_calc || 'Not calculated';
+                        document.getElementById('todayDate').textContent = data.today;
+                    }
+                })
+                .catch(error => console.error('Error loading sync status:', error));
+        }
+
+        // Progress polling
+        function startProgressPolling() {
+            document.getElementById('progressContainer').style.display = 'block';
+
+            progressInterval = setInterval(() => {
+                fetch('/api/progress')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.active) {
+                            stopProgressPolling();
+                            loadSyncStatus();
+                            if (data.operation === 'execute_screener') {
+                                loadResults();
+                            }
+                            return;
+                        }
+
+                        const percent = data.total > 0 ? Math.round((data.current / data.total) * 100) : 0;
+                        document.getElementById('progressFill').style.width = percent + '%';
+                        document.getElementById('progressPercent').textContent = percent + '%';
+                        document.getElementById('progressTitle').textContent = 'Processing: ' + data.operation.replace('_', ' ');
+                        document.getElementById('progressStatus').textContent = data.status;
+                        document.getElementById('progressCurrent').textContent = data.current;
+                        document.getElementById('progressTotal').textContent = data.total;
+                        document.getElementById('progressTicker').textContent = data.ticker;
+                        document.getElementById('progressMessage').textContent = data.message;
+
+                        // Display elapsed time and ETA
+                        if (data.time_elapsed) {
+                            document.getElementById('progressElapsed').textContent = formatTime(data.time_elapsed);
+                        } else {
+                            document.getElementById('progressElapsed').textContent = '-';
+                        }
+
+                        if (data.eta_seconds && data.eta_seconds > 0) {
+                            document.getElementById('progressETA').textContent = formatTime(data.eta_seconds) + ' remaining';
+                        } else if (data.current > 0) {
+                            document.getElementById('progressETA').textContent = 'Calculating...';
+                        } else {
+                            document.getElementById('progressETA').textContent = '-';
+                        }
+                    })
+                    .catch(error => console.error('Error polling progress:', error));
+            }, 2000); // Poll every 2 seconds
+        }
+
+        function stopProgressPolling() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            setTimeout(() => {
+                document.getElementById('progressContainer').style.display = 'none';
+            }, 3000);
+        }
+
+        // Button handlers
+        document.getElementById('btnPopulateStocks').addEventListener('click', function() {
+            if (confirm('This will fetch up to 2000 top US stocks by market cap using yfinance screener (with fallback to S&P 500 + NASDAQ 100). Continue?')) {
+                fetch('/api/populate-stocks', {method: 'POST'})
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            startProgressPolling();
+                        } else {
+                            console.error('Error: ' + data.message);
+                        }
+                    })
+                    .catch(error => console.error('Error: ' + error));
+            }
+        });
+
+        document.getElementById('btnSyncPrices').addEventListener('click', function() {
+            fetch('/api/sync-prices', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        startProgressPolling();
+                    } else {
+                        console.error('Error: ' + data.message);
+                    }
+                })
+                .catch(error => console.error('Error: ' + error));
+        });
+
+        document.getElementById('btnCalculateMetrics').addEventListener('click', function() {
+            fetch('/api/calculate-metrics', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        startProgressPolling();
+                    } else {
+                        console.error('Error: ' + data.message);
+                    }
+                })
+                .catch(error => console.error('Error: ' + error));
+        });
+
+        document.getElementById('btnExecuteScreener').addEventListener('click', function() {
+            fetch('/api/execute-screener', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        startProgressPolling();
+                    } else {
+                        console.error('Error: ' + data.message);
+                    }
+                })
+                .catch(error => console.error('Error: ' + error));
+        });
+
+        // Config management
+        let currentConfig = {};
+
+        document.getElementById('btnShowConfig').addEventListener('click', function() {
+            const display = document.getElementById('configDisplay');
+            if (display.style.display === 'none') {
+                // Load config from server
+                fetch('/api/config')
+                    .then(response => response.json())
+                    .then(data => {
+                        currentConfig = data;
+                        renderConfigForm(data);
+                        display.style.display = 'block';
+                    })
+                    .catch(error => console.error('Error: ' + error));
+            } else {
+                display.style.display = 'none';
+            }
+        });
+
+        function renderConfigForm(config) {
+            const form = document.getElementById('configForm');
+            form.innerHTML = '';
+
+            const labels = {
+                'STOCK_52W_PERCENTILE_MAX': 'Max Stock 52W Percentile',
+                'PE_RATIO_MIN': 'Min P/E Ratio',
+                'PE_RATIO_MAX': 'Max P/E Ratio',
+                'MARKET_CAP_MIN_MILLIONS': 'Min Market Cap (Millions)',
+                'AVG_VOLUME_USD_MIN_MILLIONS': 'Min Avg Volume (Millions USD)',
+                'TARGET_DTE': 'Target DTE',
+                'DTE_TOLERANCE': 'DTE Tolerance (days)',
+                'PUT_STRIKE_DISCOUNT': 'Put Strike Discount (OTM %)',
+                'MIN_ANNUALIZED_PREMIUM_YIELD': 'Min Annualized Yield',
+                'TARGET_PREMIUM_THOUSANDS': 'Target Premium (Thousands)',
+                'LATERAL_TREND_ATR_THRESHOLD': 'Lateral Trend ATR Threshold'
+            };
+
+            for (const [key, value] of Object.entries(config)) {
+                if (labels[key]) {
+                    const field = document.createElement('div');
+                    field.style.marginBottom = '10px';
+                    field.innerHTML = `
+                        <label style="display: block; color: #aaa; margin-bottom: 5px; font-size: 0.9em;">${labels[key]}</label>
+                        <input type="number"
+                               id="config_${key}"
+                               value="${value}"
+                               step="${key.includes('PERCENTILE') || key.includes('DISCOUNT') || key.includes('YIELD') || key.includes('THRESHOLD') ? '0.01' : '1'}"
+                               style="width: 100%; padding: 8px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 4px; color: #00ff88; font-family: 'Courier New', monospace;">
+                    `;
+                    form.appendChild(field);
+                }
+            }
+        }
+
+        document.getElementById('btnSaveConfig').addEventListener('click', function() {
+            const newConfig = {};
+            for (const key in currentConfig) {
+                const input = document.getElementById(`config_${key}`);
+                if (input) {
+                    newConfig[key] = parseFloat(input.value);
+                }
+            }
+
+            fetch('/api/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(newConfig)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Configuration saved successfully!');
+                } else {
+                    console.error('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => console.error('Error: ' + error));
+        });
+
+        // Load results
+        function loadResults() {
+            fetch('/api/results')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.results.length > 0) {
+                        displayResults(data.results);
+                    }
+                })
+                .catch(error => console.error('Error loading results:', error));
+        }
+
+        function displayResults(results) {
+            const tbody = document.getElementById('resultsBody');
+            tbody.innerHTML = '';
+
+            results.forEach(row => {
+                const tr = document.createElement('tr');
+                // Convert market cap from millions to billions
+                const marketCapBillions = (row.Market_Cap / 1000).toFixed(2);
+
+                tr.innerHTML = `
+                    <td><strong>${row.Ticker}</strong></td>
+                    <td>${row.Name || 'N/A'}</td>
+                    <td>$${row.Price.toFixed(2)}</td>
+                    <td>${row.Sector || 'N/A'}</td>
+                    <td>${(row.Stock_52W_Pct * 100).toFixed(1)}%</td>
+                    <td>${row.Sector_52W_Pct ? (row.Sector_52W_Pct * 100).toFixed(1) + '%' : 'N/A'}</td>
+                    <td>${row.PE_Ratio.toFixed(1)}</td>
+                    <td>${row.Sector_PE ? row.Sector_PE.toFixed(1) : 'N/A'}</td>
+                    <td>$${marketCapBillions}B</td>
+                    <td>${(row.ATR_Pct * 100).toFixed(2)}%</td>
+                    <td>$${row.Strike.toFixed(2)}</td>
+                    <td>${row.DTE}</td>
+                    <td>$${row.Premium.toFixed(2)}</td>
+                    <td style="color: #000; font-weight: bold; background-color: #00ff88; padding: 4px 8px; border-radius: 4px;">${(row.Yield * 100).toFixed(1)}%</td>
+                    <td>${row.Contracts}</td>
+                    <td>${row.Days_to_Earnings !== 'N/A' ? row.Days_to_Earnings : 'N/A'}</td>
+                    <td>
+                        <a href="${row.Chart_Link}" target="_blank" style="color: #00d9ff;">Chart</a> |
+                        <a href="${row.Options_Link}" target="_blank" style="color: #00ff88;">Options</a>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('resultsSummary').textContent = `Found ${results.length} opportunities`;
+            document.getElementById('resultsContainer').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
