@@ -43,6 +43,13 @@ This creates the database and all required tables.
 
 ### Start Web Interface
 
+Option 1: Using the quick start script (recommended)
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+Option 2: Direct Python execution
 ```bash
 python3 web_app.py
 ```
@@ -174,7 +181,7 @@ psql investing_options_screener < backup_20251030.sql
 ```
 
 ### Clean Old Data
-Old screening results (>90 days) are automatically cleaned up periodically. Prices and metrics are retained indefinitely.
+A cleanup function (`cleanup_old_data()`) exists in database.py to remove old screening results, prices, and metrics (default: 90 days retention). Currently this must be run manually if needed. Prices and metrics are retained indefinitely by default.
 
 ## File Locations
 
