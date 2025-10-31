@@ -555,20 +555,22 @@ def save_screening_result(db: Session, data: dict) -> ScreeningResult:
 
 
 def get_latest_screening_results(db: Session, days: int = 1) -> List[ScreeningResult]:
-    """Get screening results from the most recent screening run only"""
+    """Get screening results from the most recent screening date"""
     from sqlalchemy import func
 
-    # Get the most recent created_at timestamp
-    latest_run = db.query(
-        func.max(ScreeningResult.created_at)
+    # Get the most recent screening_date
+    latest_date = db.query(
+        func.max(ScreeningResult.screening_date)
     ).scalar()
 
-    if not latest_run:
+    if not latest_date:
         return []
 
-    # Get all results from that specific screening run
+    # Get all results from that screening date
+    # Note: For screening runs with shared timestamp (after fix), this will show all results from that run.
+    # For old data with different timestamps, this shows all results from that date.
     results = db.query(ScreeningResult).filter(
-        ScreeningResult.created_at == latest_run
+        ScreeningResult.screening_date == latest_date
     ).order_by(
         ScreeningResult.annualized_yield.desc()
     ).all()

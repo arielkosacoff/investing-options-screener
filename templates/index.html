@@ -207,6 +207,12 @@
         <!-- Results Section -->
         <div class="results-container" id="resultsContainer" style="display: none;">
             <h2>Screening Results</h2>
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <label for="resultsDate" style="color: #aaa;">Filter by date:</label>
+                <input type="date" id="resultsDate" style="padding: 8px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 4px; color: #00ff88; font-family: 'Courier New', monospace;">
+                <button id="btnFilterResults" class="btn btn-info" style="padding: 8px 16px;">Load Results</button>
+                <button id="btnClearDate" class="btn btn-secondary" style="padding: 8px 16px;">Show Latest</button>
+            </div>
             <div class="results-summary" id="resultsSummary"></div>
             <div class="table-container">
                 <table id="resultsTable">
@@ -215,6 +221,8 @@
                             <th>Ticker</th>
                             <th>Company Name</th>
                             <th>Price</th>
+                            <th>1D Chg</th>
+                            <th>5D Chg</th>
                             <th>Sector</th>
                             <th>Stock 52W%</th>
                             <th>Sector 52W%</th>
@@ -262,6 +270,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadSyncStatus();
             loadResults();
+
+            // Set today's date as default in date picker
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('resultsDate').value = today;
         });
 
         // Load sync status
@@ -470,16 +482,36 @@
         });
 
         // Load results
-        function loadResults() {
-            fetch('/api/results')
+        function loadResults(date = null) {
+            const url = date ? `/api/results?date=${date}` : '/api/results';
+            fetch(url)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.results.length > 0) {
                         displayResults(data.results);
+                    } else if (data.success && data.results.length === 0) {
+                        document.getElementById('resultsContainer').style.display = 'block';
+                        document.getElementById('resultsSummary').textContent = 'No results found for selected date';
+                        document.getElementById('resultsBody').innerHTML = '';
                     }
                 })
                 .catch(error => console.error('Error loading results:', error));
         }
+
+        // Filter results by date
+        document.getElementById('btnFilterResults').addEventListener('click', function() {
+            const selectedDate = document.getElementById('resultsDate').value;
+            if (selectedDate) {
+                loadResults(selectedDate);
+            }
+        });
+
+        // Clear date filter and show latest
+        document.getElementById('btnClearDate').addEventListener('click', function() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('resultsDate').value = today;
+            loadResults();
+        });
 
         function displayResults(results) {
             const tbody = document.getElementById('resultsBody');
@@ -490,10 +522,23 @@
                 // Convert market cap from millions to billions
                 const marketCapBillions = (row.Market_Cap / 1000).toFixed(2);
 
+                // Format price change with colored arrow, black text
+                const formatPriceChange = (change) => {
+                    if (change === null || change === undefined) {
+                        return '<span style="color: #888;">N/A</span>';
+                    }
+                    const percent = (change * 100).toFixed(2);
+                    const color = change >= 0 ? '#00ff88' : '#ff4444';
+                    const arrow = change >= 0 ? '↑' : '↓';
+                    return `<span style="color: ${color}; font-weight: bold;">${arrow}</span> <span style="color: #000;">${Math.abs(percent)}%</span>`;
+                };
+
                 tr.innerHTML = `
                     <td><strong>${row.Ticker}</strong></td>
                     <td>${row.Name || 'N/A'}</td>
                     <td>$${row.Price.toFixed(2)}</td>
+                    <td>${formatPriceChange(row.Price_Change_1D)}</td>
+                    <td>${formatPriceChange(row.Price_Change_5D)}</td>
                     <td>${row.Sector || 'N/A'}</td>
                     <td>${(row.Stock_52W_Pct * 100).toFixed(1)}%</td>
                     <td>${row.Sector_52W_Pct ? (row.Sector_52W_Pct * 100).toFixed(1) + '%' : 'N/A'}</td>

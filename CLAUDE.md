@@ -43,6 +43,8 @@ Automated options screening system using PostgreSQL database for persistent stor
    - Reads data from database (no live API calls except for options chains)
    - Multi-stage filtering: 52W position, relative strength, fundamentals, options premium
    - **Captures ALL qualifying options:** Returns multiple results per ticker when multiple expirations meet criteria within DTE tolerance
+   - **Single timestamp per run:** All results from same screening run share identical `created_at` timestamp
+   - **Contracts calculation:** Based on stock price (capital deployment), not premium
    - Stores results in `screening_results` table (one row per qualifying expiration)
 
 ### Web Application (`web_app.py`)
@@ -56,7 +58,7 @@ Automated options screening system using PostgreSQL database for persistent stor
 - `POST /api/sync-prices` - Update price data
 - `POST /api/calculate-metrics` - Calculate all metrics
 - `POST /api/execute-screener` - Run screening
-- `GET /api/results` - Fetch latest screening results
+- `GET /api/results?date=YYYY-MM-DD` - Fetch screening results (optional date filter, defaults to latest)
 - `GET /api/config` - Configuration management
 
 **Progress Tracking:**
@@ -72,8 +74,12 @@ Automated options screening system using PostgreSQL database for persistent stor
 2. Four workflow buttons (populate → sync → calculate → screen)
 3. Real-time progress bar with current ticker/status/ETA
 4. **ETA display:** Shows "Xm Ys remaining" during operations
-5. Results table with comprehensive columns
-6. Configuration viewer
+5. **Date selector:** Filter results by date with "Load Results" and "Show Latest" buttons (defaults to today)
+6. **Results table** with comprehensive columns including:
+   - 1D/5D price changes (colored arrows: green ↑ for gains, red ↓ for losses)
+   - Stock/sector positioning, fundamentals, options details
+   - Calculated dynamically from price history (not stored in database)
+7. Configuration viewer
 
 ## Configuration System
 
@@ -130,6 +136,8 @@ Automated options screening system using PostgreSQL database for persistent stor
 - Multiple results per ticker if multiple expirations qualify
 - Each result represents one expiration date with its optimal strike
 - User can review all opportunities and select preferred expiration
+- **Contracts calculation:** Number of contracts needed to deploy target capital (based on stock price × 100 shares per contract)
+- **Price change indicators:** 1-day and 5-day price changes shown with colored arrows
 
 ## Technical Details
 

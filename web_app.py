@@ -9,7 +9,7 @@ import os
 import time
 import webbrowser
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from threading import Timer, Thread
 from typing import Dict, Optional
@@ -432,21 +432,72 @@ def api_execute_screener():
 
 @app.route('/api/results')
 def api_results():
-    """Get latest screening results"""
+    """Get screening results (optionally filtered by date)"""
+    from database import get_price_history, get_screening_results_by_date
+
+    # Get optional date parameter
+    date_param = request.args.get('date', None)
+
     db = get_db()
 
     try:
-        results = get_latest_screening_results(db, days=1)
+        # Get results by date if specified, otherwise get latest
+        if date_param:
+            try:
+                query_date = datetime.strptime(date_param, '%Y-%m-%d').date()
+                results = get_screening_results_by_date(db, query_date)
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid date format. Use YYYY-MM-DD'
+                }), 400
+        else:
+            results = get_latest_screening_results(db, days=1)
 
         results_list = []
         for r in results:
             # Get ticker symbol
             ticker = db.query(Ticker).filter_by(id=r.ticker_id).first()
 
+            # Calculate price changes dynamically
+            price_change_1d = None
+            price_change_5d = None
+
+            if ticker:
+                try:
+                    # Get price history for the last 7 days (to calculate 5-day change)
+                    end_date = r.screening_date
+                    start_date = end_date - timedelta(days=7)
+                    prices = get_price_history(db, ticker.id, start_date, end_date)
+
+                    if prices and len(prices) > 0:
+                        current_price = float(r.stock_price)
+
+                        # Sort by date descending
+                        prices_sorted = sorted(prices, key=lambda p: p.date, reverse=True)
+
+                        # 1-day change (compare to yesterday)
+                        if len(prices_sorted) >= 2:
+                            yesterday_price = float(prices_sorted[1].close)
+                            if yesterday_price > 0:
+                                price_change_1d = ((current_price - yesterday_price) / yesterday_price)
+
+                        # 5-day change (compare to 5 days ago)
+                        if len(prices_sorted) >= 6:
+                            five_days_ago_price = float(prices_sorted[5].close)
+                            if five_days_ago_price > 0:
+                                price_change_5d = ((current_price - five_days_ago_price) / five_days_ago_price)
+                    else:
+                        logger.debug(f"{ticker.symbol}: No price history found for date range {start_date} to {end_date}")
+                except Exception as e:
+                    logger.error(f"Error calculating price changes for {ticker.symbol}: {e}", exc_info=True)
+
             results_list.append({
                 'Ticker': ticker.symbol if ticker else 'N/A',
                 'Name': ticker.name if ticker else 'N/A',
                 'Price': float(r.stock_price) if r.stock_price else 0,
+                'Price_Change_1D': price_change_1d,
+                'Price_Change_5D': price_change_5d,
                 'Industry': r.industry,
                 'Sector': r.sector,
                 'Sector_ETF': r.sector_etf,

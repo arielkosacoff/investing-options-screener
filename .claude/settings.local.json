@@ -15,7 +15,9 @@
       "Bash(PGPASSWORD=$DB_PASSWORD psql:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(git push:*)",
+      "Read(//Users/arielkosacoff/.claude/**)"
     ],
     "deny": [],
     "ask": []

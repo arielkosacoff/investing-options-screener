@@ -84,7 +84,11 @@ Run these steps in order (use the web UI buttons):
 4. **Execute Screener** (~10-20 min)
    - Filters stocks and analyzes options chains
    - **Captures all qualifying expirations:** Multiple results per ticker when multiple options within DTE tolerance meet premium criteria
-   - Displays all opportunities in results table (one row per expiration)
+   - All results from same run share identical timestamp for easy filtering
+   - Displays all opportunities in results table with:
+     - 1D/5D price changes (green ↑ gains, red ↓ losses)
+     - One row per qualifying expiration
+     - Date selector to view historical screening results
    - **Shows ETA:** Real-time progress with time remaining
 
 ## Daily Usage
@@ -104,6 +108,8 @@ After initial setup, only run:
 
 - Progress bars show real-time status during operations
 - "Data Status" section displays last sync dates
+- **Date selector:** View screening results from any date (defaults to today)
+- **Price change indicators:** 1D and 5D changes calculated dynamically from price history
 - Check `screener.log` for detailed logs
 
 ## Configuration
@@ -118,7 +124,7 @@ Default configuration:
 - Target DTE: 30 days (±7 days tolerance)
 - Put strike: 10% OTM
 - Min annualized yield: 36%
-- Target premium: $10,000
+- Target capital deployment: $10,000 (contracts calculated based on stock price, not premium)
 - ATR threshold: 3% (for lateral trend detection)
 
 ## Troubleshooting

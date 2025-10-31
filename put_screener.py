@@ -248,8 +248,9 @@ def screen_ticker(
         # Build results list - one entry per qualifying option
         results = []
         for put_option in qualifying_puts:
-            # Calculate contracts needed for this option
-            contracts_needed = int(target_premium / (put_option['premium'] * 100)) if put_option['premium'] > 0 else 0
+            # Calculate contracts needed based on stock price (capital required if assigned)
+            # Each contract controls 100 shares, so capital per contract = stock_price * 100
+            contracts_needed = int(target_premium / (current_price * 100)) if current_price > 0 else 0
 
             result = {
                 'ticker_id': ticker.id,
@@ -311,6 +312,9 @@ def screen_all_stocks(
     if screening_date is None:
         screening_date = date.today()
 
+    # Generate single timestamp for this screening run
+    screening_run_timestamp = datetime.utcnow()
+
     db = get_db()
     stats = {
         'passed_count': 0,
@@ -339,8 +343,9 @@ def screen_all_stocks(
                 results = screen_ticker(ticker, screening_date, config)
 
                 if results:
-                    # Save all results to database
+                    # Save all results to database with same timestamp
                     for result in results:
+                        result['created_at'] = screening_run_timestamp
                         save_screening_result(db, result)
                         stats['results'].append(result)
 
