@@ -62,10 +62,11 @@ def screen_ticker(
     ticker: Ticker,
     screening_date: date,
     config: Dict
-) -> Optional[Dict]:
+) -> Optional[List[Dict]]:
     """
     Screen a single ticker against all criteria.
-    Returns dict with results if passed, None if failed any criteria.
+    Returns list of dicts (one per qualifying option) if passed, None if failed any criteria.
+    Each dict represents one expiration date that meets all screening criteria.
     """
     db = get_db()
 
@@ -174,12 +175,11 @@ def screen_ticker(
                 logger.debug(f"{ticker.symbol}: No options available")
                 return None
 
-            # Find expiration near TARGET_DTE
+            # Find ALL expirations within TARGET_DTE tolerance
             target_date = date.today() + timedelta(days=config['TARGET_DTE'])
             tolerance = timedelta(days=config['DTE_TOLERANCE'])
 
-            best_put = None
-            best_dte_diff = float('inf')
+            qualifying_puts = []
 
             for exp_str in expirations:
                 exp_date = pd.to_datetime(exp_str).date()
@@ -214,20 +214,18 @@ def screen_ticker(
                         annual_yield = (premium / strike) * (365 / dte)
 
                         if annual_yield >= config['MIN_ANNUALIZED_PREMIUM_YIELD']:
-                            dte_diff = abs((exp_date - target_date).days)
-                            if dte_diff < best_dte_diff:
-                                best_dte_diff = dte_diff
-                                best_put = {
-                                    'strike': strike,
-                                    'bid': bid,
-                                    'ask': ask,
-                                    'premium': premium,
-                                    'dte': dte,
-                                    'annual_yield': annual_yield,
-                                    'spread': ask - bid
-                                }
+                            qualifying_puts.append({
+                                'strike': strike,
+                                'bid': bid,
+                                'ask': ask,
+                                'premium': premium,
+                                'dte': dte,
+                                'annual_yield': annual_yield,
+                                'spread': ask - bid,
+                                'expiration': exp_date
+                            })
 
-            if not best_put:
+            if not qualifying_puts:
                 logger.debug(f"{ticker.symbol}: No puts meeting premium criteria")
                 return None
 
@@ -239,49 +237,54 @@ def screen_ticker(
         dist_high_pct = ((week_52_high - current_price) / current_price) if current_price > 0 else 0
         dist_low_pct = ((current_price - week_52_low) / current_price) if current_price > 0 else 0
 
-        # Calculate contracts needed for target premium
-        target_premium = config['TARGET_PREMIUM_THOUSANDS'] * 1000
-        contracts_needed = int(target_premium / (best_put['premium'] * 100)) if best_put['premium'] > 0 else 0
-
         # Days to earnings (convert to int if present)
         days_to_earnings = metrics.get('days_to_earnings')
         if days_to_earnings is not None:
             days_to_earnings = int(days_to_earnings)
 
-        # Build result
-        result = {
-            'ticker_id': ticker.id,
-            'screening_date': screening_date,
-            'stock_price': float(current_price),
-            'industry': ticker.industry.name if ticker.industry else None,
-            'sector': ticker.sector.name if ticker.sector else None,
-            'sector_etf': ticker.sector.symbol if ticker.sector else None,
-            'stock_52w_pct': float(stock_52w_pct),
-            'week_52_high': float(week_52_high),
-            'week_52_low': float(week_52_low),
-            'dist_high_pct': float(dist_high_pct),
-            'dist_low_pct': float(dist_low_pct),
-            'sector_52w_pct': float(sector_52w_pct) if sector_52w_pct is not None else None,
-            'pe_ratio': float(stock_pe),
-            'sector_pe': float(sector_pe) if sector_pe is not None else None,
-            'market_cap_millions': int(market_cap_millions),
-            'avg_volume_millions': float(avg_volume_millions),
-            'atr_pct': float(atr_pct),
-            'is_lateral': bool(is_lateral),
-            'put_strike': float(best_put['strike']),
-            'dte': int(best_put['dte']),
-            'bid': float(best_put['bid']),
-            'ask': float(best_put['ask']),
-            'spread': float(best_put['spread']),
-            'premium': float(best_put['premium']),
-            'annualized_yield': float(best_put['annual_yield']),
-            'contracts_needed': int(contracts_needed),
-            'days_to_earnings': days_to_earnings,
-            'chart_link': f'https://finance.yahoo.com/quote/{ticker.symbol}',
-            'options_link': f'https://finance.yahoo.com/quote/{ticker.symbol}/options'
-        }
+        # Target premium for contracts calculation
+        target_premium = config['TARGET_PREMIUM_THOUSANDS'] * 1000
 
-        return result
+        # Build results list - one entry per qualifying option
+        results = []
+        for put_option in qualifying_puts:
+            # Calculate contracts needed for this option
+            contracts_needed = int(target_premium / (put_option['premium'] * 100)) if put_option['premium'] > 0 else 0
+
+            result = {
+                'ticker_id': ticker.id,
+                'screening_date': screening_date,
+                'stock_price': float(current_price),
+                'industry': ticker.industry.name if ticker.industry else None,
+                'sector': ticker.sector.name if ticker.sector else None,
+                'sector_etf': ticker.sector.symbol if ticker.sector else None,
+                'stock_52w_pct': float(stock_52w_pct),
+                'week_52_high': float(week_52_high),
+                'week_52_low': float(week_52_low),
+                'dist_high_pct': float(dist_high_pct),
+                'dist_low_pct': float(dist_low_pct),
+                'sector_52w_pct': float(sector_52w_pct) if sector_52w_pct is not None else None,
+                'pe_ratio': float(stock_pe),
+                'sector_pe': float(sector_pe) if sector_pe is not None else None,
+                'market_cap_millions': int(market_cap_millions),
+                'avg_volume_millions': float(avg_volume_millions),
+                'atr_pct': float(atr_pct),
+                'is_lateral': bool(is_lateral),
+                'put_strike': float(put_option['strike']),
+                'dte': int(put_option['dte']),
+                'bid': float(put_option['bid']),
+                'ask': float(put_option['ask']),
+                'spread': float(put_option['spread']),
+                'premium': float(put_option['premium']),
+                'annualized_yield': float(put_option['annual_yield']),
+                'contracts_needed': int(contracts_needed),
+                'days_to_earnings': days_to_earnings,
+                'chart_link': f'https://finance.yahoo.com/quote/{ticker.symbol}',
+                'options_link': f'https://finance.yahoo.com/quote/{ticker.symbol}/options'
+            }
+            results.append(result)
+
+        return results
 
     except Exception as e:
         logger.error(f"{ticker.symbol}: Error during screening - {e}")
@@ -332,16 +335,18 @@ def screen_all_stocks(
                 if progress_callback:
                     progress_callback(idx, stats['total'], ticker.symbol, 'screening', stats['passed_count'])
 
-                # Screen ticker
-                result = screen_ticker(ticker, screening_date, config)
+                # Screen ticker - returns list of results (one per qualifying option)
+                results = screen_ticker(ticker, screening_date, config)
 
-                if result:
-                    # Save to database
-                    save_screening_result(db, result)
-                    stats['passed_count'] += 1
-                    stats['results'].append(result)
+                if results:
+                    # Save all results to database
+                    for result in results:
+                        save_screening_result(db, result)
+                        stats['results'].append(result)
 
-                    logger.info(f"{ticker.symbol}: PASSED screening ({stats['passed_count']} total)")
+                    stats['passed_count'] += len(results)
+
+                    logger.info(f"{ticker.symbol}: PASSED screening with {len(results)} option(s) ({stats['passed_count']} total opportunities)")
 
                     if progress_callback:
                         progress_callback(idx, stats['total'], ticker.symbol, 'passed', stats['passed_count'])

@@ -42,7 +42,8 @@ Automated options screening system using PostgreSQL database for persistent stor
 4. **`put_screener.py`** - Options Screening Engine
    - Reads data from database (no live API calls except for options chains)
    - Multi-stage filtering: 52W position, relative strength, fundamentals, options premium
-   - Stores results in `screening_results` table
+   - **Captures ALL qualifying options:** Returns multiple results per ticker when multiple expirations meet criteria within DTE tolerance
+   - Stores results in `screening_results` table (one row per qualifying expiration)
 
 ### Web Application (`web_app.py`)
 
@@ -121,8 +122,14 @@ Automated options screening system using PostgreSQL database for persistent stor
 - Relative strength: Stock < Sector < Market
 - PE ratio within range and below sector/market PE
 - Minimum market cap and volume
-- Put option near target DTE with minimum annualized yield
+- Put options near target DTE with minimum annualized yield
+- **Multiple expirations:** All options within DTE tolerance that meet premium criteria are captured
 - Optional: Lateral trend detection via ATR threshold
+
+**Output:**
+- Multiple results per ticker if multiple expirations qualify
+- Each result represents one expiration date with its optimal strike
+- User can review all opportunities and select preferred expiration
 
 ## Technical Details
 

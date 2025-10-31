@@ -12,7 +12,10 @@
       "Bash(psql:*)",
       "Bash(source .env)",
       "Bash(PGPASSWORD=root psql:*)",
-      "Bash(PGPASSWORD=$DB_PASSWORD psql:*)"
+      "Bash(PGPASSWORD=$DB_PASSWORD psql:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ],
     "deny": [],
     "ask": []

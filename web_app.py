@@ -471,6 +471,7 @@ def api_results():
                 'Yield': float(r.annualized_yield) if r.annualized_yield else 0,
                 'Contracts': r.contracts_needed,
                 'Days_to_Earnings': r.days_to_earnings if r.days_to_earnings else 'N/A',
+                'Created_At': r.created_at.strftime('%Y-%m-%d %H:%M:%S') if r.created_at else 'N/A',
                 'Chart_Link': r.chart_link,
                 'Options_Link': r.options_link
             })

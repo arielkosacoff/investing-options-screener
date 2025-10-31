@@ -83,7 +83,8 @@ Run these steps in order (use the web UI buttons):
 
 4. **Execute Screener** (~10-20 min)
    - Filters stocks and analyzes options chains
-   - Displays opportunities in results table
+   - **Captures all qualifying expirations:** Multiple results per ticker when multiple options within DTE tolerance meet premium criteria
+   - Displays all opportunities in results table (one row per expiration)
    - **Shows ETA:** Real-time progress with time remaining
 
 ## Daily Usage
@@ -97,7 +98,7 @@ After initial setup, only run:
    - Updates metrics with latest prices
 
 3. **Execute Screener** (~10-20 min)
-   - Finds current opportunities
+   - Finds current opportunities (multiple expirations per ticker when applicable)
 
 ## Monitoring Progress
 

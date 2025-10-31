@@ -228,6 +228,7 @@
                             <th>Yield</th>
                             <th>Contracts</th>
                             <th>Days to Earnings</th>
+                            <th>Created At</th>
                             <th>Links</th>
                         </tr>
                     </thead>
@@ -506,6 +507,7 @@
                     <td style="color: #000; font-weight: bold; background-color: #00ff88; padding: 4px 8px; border-radius: 4px;">${(row.Yield * 100).toFixed(1)}%</td>
                     <td>${row.Contracts}</td>
                     <td>${row.Days_to_Earnings !== 'N/A' ? row.Days_to_Earnings : 'N/A'}</td>
+                    <td><small>${row.Created_At || 'N/A'}</small></td>
                     <td>
                         <a href="${row.Chart_Link}" target="_blank" style="color: #00d9ff;">Chart</a> |
                         <a href="${row.Options_Link}" target="_blank" style="color: #00ff88;">Options</a>
